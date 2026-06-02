@@ -3,7 +3,7 @@
  * set-icons.php — ใส่ Blocksy menu icon ให้เมนูที่ยัง "ว่าง" (ข้ามตัวที่มีอยู่แล้ว)
  *
  * รันตรงจาก GitHub ได้ (ไม่ต้องเซฟไฟล์):
- *   URL='https://raw.githubusercontent.com/visionteamseo1/Set-Icons/main/set-icons.php'
+ *   URL='https://raw.githubusercontent.com/ufavisionseoteam19/Set-Icons/main/set-icons.php'
  *   curl -s "$URL?v=$(date +%s)" | php -- naka888s.org
  *   curl -s "$URL?v=$(date +%s)" | php -- naka888s.org --commit --purge
  *   curl -s "$URL?v=$(date +%s)" | php -- d1.com d2.com d3.com --commit --purge
@@ -23,7 +23,7 @@
 if (PHP_SAPI !== 'cli') { fwrite(STDERR, "CLI only\n"); exit(1); }
 
 // ====== ตั้งค่า URL ของสคริปต์ตัวเองบน GitHub (แก้ให้ตรง repo คุณ) ======
-const SELF_URL = 'https://raw.githubusercontent.com/visionteamseo1/Set-Icons/main/set-icons.php';
+const SELF_URL = 'https://raw.githubusercontent.com/ufavisionseoteam19/Set-Icons/main/set-icons.php';
 
 global $argv;
 
