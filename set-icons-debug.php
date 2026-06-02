@@ -30,8 +30,10 @@ $dumpId = null;
 foreach ($argv as $a) {
     if (strpos($a, '--docroot=') === 0) { $childDocroot = substr($a, 10); }
     if (strpos($a, '--dump=') === 0)    { $dumpId = (int)substr($a, 7); }
+    if ($a === '--dumpall')             { $GLOBALS['__dumpall'] = true; }
 }
 if ($childDocroot !== null) {
+    if (!empty($GLOBALS['__dumpall'])) { dump_all($childDocroot); exit(0); }
     if ($dumpId !== null) { dump_item($childDocroot, $dumpId); exit(0); }
     run_phase2($childDocroot);
     exit(0);
@@ -49,7 +51,7 @@ $domains = [];
 $csvPath = null;
 
 foreach ($argvRest as $a) {
-    if (in_array($a, ['--commit','--purge','--yes','-y','--','-'], true) || strpos($a,'--dump=')===0) {
+    if (in_array($a, ['--commit','--purge','--yes','-y','--','-','--dumpall'], true) || strpos($a,'--dump=')===0) {
         continue;
     } elseif ($a === '--csv') {
         $csvPath = 'domains-config.csv';
@@ -188,7 +190,7 @@ function process_domain(string $domain, bool $commit, bool $purge,
     $childArgs = [escapeshellarg($domain), '--docroot=' . escapeshellarg($docroot)];
     if ($commit) $childArgs[] = '--commit';
     if ($purge)  $childArgs[] = '--purge';
-    foreach ($GLOBALS['argv'] as $ga) { if (strpos($ga, '--dump=') === 0) { $childArgs[] = escapeshellarg($ga); } }
+    foreach ($GLOBALS['argv'] as $ga) { if (strpos($ga, '--dump=') === 0 || $ga === '--dumpall') { $childArgs[] = escapeshellarg($ga); } }
     $argStr = implode(' ', $childArgs);
 
     if ($runFromFile) {
@@ -241,6 +243,41 @@ function read_domains_from_csv(string $path): array {
 }
 
 
+
+
+// ============================================================
+//  DEBUG: dumpall — แสดง icon ปัจจุบันของทุกเมนู (เก็บค่า blc ที่ถูกต้อง)
+// ============================================================
+function dump_all(string $docroot): void {
+    if (!$docroot || !file_exists("$docroot/wp-load.php")) {
+        fwrite(STDERR, "  ERROR: docroot ไม่ถูกต้อง ($docroot)\n"); exit(1);
+    }
+    define('WP_USE_THEMES', false);
+    require_once "$docroot/wp-load.php";
+
+    $locs = get_nav_menu_locations();
+    if (empty($locs)) { echo "  ไม่พบ menu location\n"; exit(0); }
+
+    echo "=== DUMPALL: icon ปัจจุบันของทุกเมนู ===\n";
+    printf("%-6s | %-22s | %s\n", "ID", "ชื่อเมนู", "icon ที่เก็บไว้");
+    echo str_repeat('-', 70) . "\n";
+
+    $seen = [];
+    foreach ($locs as $loc => $menu_id) {
+        $items = wp_get_nav_menu_items($menu_id);
+        if (!$items) continue;
+        foreach ($items as $it) {
+            if (isset($seen[$it->ID])) continue;
+            $seen[$it->ID] = true;
+            $title = html_entity_decode($it->title, ENT_QUOTES);
+            $opt   = get_post_meta($it->ID, 'blocksy_post_meta_options', true);
+            $icon  = (is_array($opt) && isset($opt['menu_item_icon']['icon']))
+                     ? $opt['menu_item_icon']['icon'] : '(ว่าง)';
+            printf("%-6s | %-22s | %s\n", $it->ID, mb_substr($title,0,22), $icon);
+        }
+    }
+    echo "=== END DUMPALL ===\n";
+}
 
 // ============================================================
 //  DEBUG: dump โครงสร้าง post meta ของ menu item (เทียบ working vs new)
