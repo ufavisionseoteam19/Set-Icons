@@ -3,7 +3,7 @@
  * set-icons.php — ใส่ Blocksy menu icon ให้เมนูที่ยัง "ว่าง" (ข้ามตัวที่มีอยู่แล้ว)
  *
  * รันตรงจาก GitHub (ไม่ต้องเซฟไฟล์):
- *   URL='https://raw.githubusercontent.com/visionteamseo1/Set-Icons/main/set-icons.php'
+ *   URL='https://raw.githubusercontent.com/ufavisionseoteam19/Set-Icons/main/set-icons.php'
  *   curl -s "$URL?v=$(date +%s)" | php -- naka888s.org                      # dry-run
  *   curl -s "$URL?v=$(date +%s)" | php -- naka888s.org --commit --purge     # เขียนจริง (จะถามยืนยันก่อน)
  *   curl -s "$URL?v=$(date +%s)" | php -- d1 d2 d3 --commit --purge --yes   # เขียนจริง ข้ามการยืนยัน
@@ -18,7 +18,7 @@
 if (PHP_SAPI !== 'cli') { fwrite(STDERR, "CLI only\n"); exit(1); }
 
 // ====== URL ของสคริปต์ตัวเองบน GitHub (แก้ให้ตรง repo คุณ) ======
-const SELF_URL = 'https://raw.githubusercontent.com/visionteamseo1/Set-Icons/main/set-icons.php';
+const SELF_URL = 'https://raw.githubusercontent.com/ufavisionseoteam19/Set-Icons/main/set-icons.php';
 
 global $argv;
 
@@ -197,16 +197,24 @@ function process_domain(string $domain, bool $commit, bool $purge,
         $ok  = false;
         for ($try = 1; $try <= 5; $try++) {
             $url  = SELF_URL . '?v=' . time() . mt_rand(10000,99999);
-            $body = shell_exec('curl -s ' . escapeshellarg($url));
+            // ดึงพร้อม HTTP code เพื่อ debug
+            $body = shell_exec('curl -s -w "\nHTTPCODE:%{http_code}" ' . escapeshellarg($url));
+            $httpcode = '?';
+            if ($body !== null && preg_match('/HTTPCODE:(\d+)\s*$/', $body, $m)) {
+                $httpcode = $m[1];
+                $body = preg_replace('/\nHTTPCODE:\d+\s*$/', '', $body);
+            }
+            $first = $body !== null ? substr(ltrim($body), 0, 5) : '(null)';
+            fwrite(STDERR, "  [child try $try] HTTP=$httpcode head='$first' url=" . SELF_URL . "\n");
             if ($body !== null && strpos($body, '<?php') === 0) {
                 file_put_contents($tmp, $body);
                 @chmod($tmp, 0644);
                 $ok = true; break;
             }
-            usleep(800000); // รอ 0.8 วิ แล้วลองใหม่
+            usleep(800000);
         }
         if (!$ok) {
-            fwrite(STDERR, "  ERROR: ดึงสคริปต์จาก GitHub ไม่สำเร็จ (raw 404 ชั่วคราว) ลองใหม่อีกครั้ง\n");
+            fwrite(STDERR, "  ERROR: ดึงสคริปต์จาก GitHub ไม่สำเร็จ (ดู HTTP code ด้านบน)\n");
             return 1;
         }
         $cmd = sprintf('sudo -u %s %s %s %s',
