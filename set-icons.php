@@ -197,24 +197,16 @@ function process_domain(string $domain, bool $commit, bool $purge,
         $ok  = false;
         for ($try = 1; $try <= 5; $try++) {
             $url  = SELF_URL . '?v=' . time() . mt_rand(10000,99999);
-            // ดึงพร้อม HTTP code เพื่อ debug
-            $body = shell_exec('curl -s -w "\nHTTPCODE:%{http_code}" ' . escapeshellarg($url));
-            $httpcode = '?';
-            if ($body !== null && preg_match('/HTTPCODE:(\d+)\s*$/', $body, $m)) {
-                $httpcode = $m[1];
-                $body = preg_replace('/\nHTTPCODE:\d+\s*$/', '', $body);
-            }
-            $first = $body !== null ? substr(ltrim($body), 0, 5) : '(null)';
-            fwrite(STDERR, "  [child try $try] HTTP=$httpcode head='$first' url=" . SELF_URL . "\n");
+            $body = shell_exec('curl -s ' . escapeshellarg($url));
             if ($body !== null && strpos($body, '<?php') === 0) {
                 file_put_contents($tmp, $body);
                 @chmod($tmp, 0644);
                 $ok = true; break;
             }
-            usleep(800000);
+            usleep(800000); // รอ 0.8 วิ แล้วลองใหม่
         }
         if (!$ok) {
-            fwrite(STDERR, "  ERROR: ดึงสคริปต์จาก GitHub ไม่สำเร็จ (ดู HTTP code ด้านบน)\n");
+            fwrite(STDERR, "  ERROR: ดึงสคริปต์จาก GitHub ไม่สำเร็จ (raw ตอบ 404 ครบ 5 ครั้ง) ลองรันใหม่อีกครั้ง\n");
             return 1;
         }
         $cmd = sprintf('sudo -u %s %s %s %s',
