@@ -31,8 +31,10 @@ foreach ($argv as $a) {
     if (strpos($a, '--docroot=') === 0) { $childDocroot = substr($a, 10); }
     if (strpos($a, '--dump=') === 0)    { $dumpId = (int)substr($a, 7); }
     if ($a === '--dumpall')             { $GLOBALS['__dumpall'] = true; }
+    if ($a === '--diag')                { $GLOBALS['__diag'] = true; }
 }
 if ($childDocroot !== null) {
+    if (!empty($GLOBALS['__diag']))    { diag_titles($childDocroot); exit(0); }
     if (!empty($GLOBALS['__dumpall'])) { dump_all($childDocroot); exit(0); }
     if ($dumpId !== null) { dump_item($childDocroot, $dumpId); exit(0); }
     run_phase2($childDocroot);
@@ -51,7 +53,7 @@ $domains = [];
 $csvPath = null;
 
 foreach ($argvRest as $a) {
-    if (in_array($a, ['--commit','--purge','--yes','-y','--','-','--dumpall'], true) || strpos($a,'--dump=')===0) {
+    if (in_array($a, ['--commit','--purge','--yes','-y','--','-','--dumpall','--diag'], true) || strpos($a,'--dump=')===0) {
         continue;
     } elseif ($a === '--csv') {
         $csvPath = 'domains-config.csv';
@@ -190,7 +192,7 @@ function process_domain(string $domain, bool $commit, bool $purge,
     $childArgs = [escapeshellarg($domain), '--docroot=' . escapeshellarg($docroot)];
     if ($commit) $childArgs[] = '--commit';
     if ($purge)  $childArgs[] = '--purge';
-    foreach ($GLOBALS['argv'] as $ga) { if (strpos($ga, '--dump=') === 0 || $ga === '--dumpall') { $childArgs[] = escapeshellarg($ga); } }
+    foreach ($GLOBALS['argv'] as $ga) { if (strpos($ga, '--dump=') === 0 || $ga === '--dumpall' || $ga === '--diag') { $childArgs[] = escapeshellarg($ga); } }
     $argStr = implode(' ', $childArgs);
 
     if ($runFromFile) {
@@ -244,6 +246,55 @@ function read_domains_from_csv(string $path): array {
 
 
 
+
+
+// ============================================================
+//  DEBUG: diag — เทียบชื่อเมนูที่ไม่ตรงตาราง (หาอักขระซ่อน)
+// ============================================================
+function diag_titles(string $docroot): void {
+    if (!$docroot || !file_exists("$docroot/wp-load.php")) {
+        fwrite(STDERR, "  ERROR: docroot ไม่ถูกต้อง ($docroot)\n"); exit(1);
+    }
+    define('WP_USE_THEMES', false);
+    require_once "$docroot/wp-load.php";
+
+    $ICON_MAP = [
+        'หน้าหลัก'=>1,'เข้าสู่ระบบ'=>1,'สมัครสมาชิก'=>1,'บทความ'=>1,'เกี่ยวกับเรา'=>1,
+        'สล็อตออนไลน์'=>1,'โปรโมชั่น'=>1,'ติดต่อเรา'=>1,'บริการของเรา'=>1,
+        'คำถามที่พบบ่อย'=>1,'Term & Condition'=>1,'Privacy Policy'=>1,
+    ];
+
+    $menus = wp_get_nav_menus();
+    echo "=== DIAG: ชื่อเมนูที่ไม่ตรงตาราง ===\n";
+    $seen = [];
+    foreach ($menus as $menu) {
+        $items = wp_get_nav_menu_items($menu->term_id);
+        if (!$items) continue;
+        foreach ($items as $it) {
+            if (isset($seen[$it->ID])) continue;
+            $seen[$it->ID] = true;
+            $title = html_entity_decode($it->title, ENT_QUOTES);
+            if (isset($ICON_MAP[$title])) continue;
+
+            echo "\n[ID {$it->ID}] menu='{$menu->name}'\n";
+            echo "  ชื่อจริง  : \"$title\"\n";
+            echo "  byte len  : " . strlen($title) . " | char len: " . mb_strlen($title) . "\n";
+            echo "  hex       : " . bin2hex($title) . "\n";
+
+            // หา key ที่ใกล้สุด (ตัดช่องว่าง/normalize แล้วเทียบ)
+            $tn = preg_replace('/\s+/u', '', $title);
+            foreach (array_keys($ICON_MAP) as $k) {
+                if (preg_replace('/\s+/u', '', $k) === $tn) {
+                    echo "  ~ ใกล้กับ : \"$k\"\n";
+                    echo "  key hex   : " . bin2hex($k) . "\n";
+                    echo "  >> ต่างแค่ช่องว่าง/อักขระซ่อน\n";
+                    break;
+                }
+            }
+        }
+    }
+    echo "\n=== END DIAG ===\n";
+}
 
 // ============================================================
 //  DEBUG: dumpall — แสดง icon ปัจจุบันของทุกเมนู (เก็บค่า blc ที่ถูกต้อง)
