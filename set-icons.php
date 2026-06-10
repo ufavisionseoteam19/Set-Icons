@@ -3,7 +3,7 @@
  * set-icons.php — ใส่ Blocksy menu icon ให้เมนูที่ยัง "ว่าง" (ข้ามตัวที่มีอยู่แล้ว)
  *
  * รันตรงจาก GitHub (ไม่ต้องเซฟไฟล์):
- *   URL='https://raw.githubusercontent.com/ufavisionseoteam19/Set-Icons/main/set-icons.php'
+ *   URL='https://raw.githubusercontent.com/visionteamseo1/Set-Icons/main/set-icons.php'
  *   curl -s "$URL?v=$(date +%s)" | php -- naka888s.org                      # dry-run
  *   curl -s "$URL?v=$(date +%s)" | php -- naka888s.org --commit --purge     # เขียนจริง (จะถามยืนยันก่อน)
  *   curl -s "$URL?v=$(date +%s)" | php -- d1 d2 d3 --commit --purge --yes   # เขียนจริง ข้ามการยืนยัน
@@ -18,7 +18,7 @@
 if (PHP_SAPI !== 'cli') { fwrite(STDERR, "CLI only\n"); exit(1); }
 
 // ====== URL ของสคริปต์ตัวเองบน GitHub (แก้ให้ตรง repo คุณ) ======
-const SELF_URL = 'https://raw.githubusercontent.com/ufavisionseoteam19/Set-Icons/main/set-icons.php';
+const SELF_URL = 'https://raw.githubusercontent.com/visionteamseo1/Set-Icons/main/set-icons.php';
 
 global $argv;
 
@@ -282,6 +282,15 @@ function run_phase2(string $docroot): void {
 
     $changed = 0; $skipped = 0; $nomatch = 0;
 
+    // สร้างตารางเทียบแบบ normalize (ตัดช่องว่างหัวท้าย+ยุบช่องว่างซ้ำ+ตัดอักขระซ่อน)
+    $normalize = function (string $t): string {
+        $t = preg_replace('/[\x{200B}-\x{200D}\x{FEFF}\x{00A0}]/u', '', $t); // zero-width / nbsp
+        $t = preg_replace('/\s+/u', ' ', $t);
+        return trim($t);
+    };
+    $ICON_MAP_NORM = [];
+    foreach ($ICON_MAP as $k => $v) { $ICON_MAP_NORM[$normalize($k)] = $v; }
+
     foreach ($menus as $menu) {
         $menu_id = (int)$menu->term_id;
         $size    = in_array($menu_id, $mobileMenuIds, true) ? '18' : '22';
@@ -291,17 +300,18 @@ function run_phase2(string $docroot): void {
         echo "  === {$menu->name} (size $size) ===\n";
         foreach ($items as $it) {
             $title = html_entity_decode($it->title, ENT_QUOTES);
+            $tnorm = $normalize($title);
             $opt   = get_post_meta($it->ID, 'blocksy_post_meta_options', true);
             $has   = (is_array($opt) && isset($opt['menu_item_icon']['icon'])
                       && $opt['menu_item_icon']['icon'] !== '');
 
             if ($has) { echo "    SKIP  [{$it->ID}] {$title}\n"; $skipped++; continue; }
-            if (!isset($ICON_MAP[$title])) {
+            if (!isset($ICON_MAP_NORM[$tnorm])) {
                 echo "    ????  [{$it->ID}] {$title} (ชื่อไม่ตรงตาราง - ข้าม)\n";
                 $nomatch++; continue;
             }
 
-            $icon = $ICON_MAP[$title];
+            $icon = $ICON_MAP_NORM[$tnorm];
             echo "    SET   [{$it->ID}] {$title} => {$icon} (size {$size})\n";
             $changed++;
 
