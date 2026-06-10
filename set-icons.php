@@ -192,10 +192,29 @@ function process_domain(string $domain, bool $commit, bool $purge,
             escapeshellarg($owner), escapeshellarg($php),
             escapeshellarg($self), $argStr);
     } else {
-        $url = SELF_URL . '?v=' . time();
-        $cmd = sprintf('curl -s %s | sudo -u %s %s -- %s',
-            escapeshellarg($url), escapeshellarg($owner),
-            escapeshellarg($php), $argStr);
+        // ดึงโค้ดตัวเองมาเก็บ temp ก่อน (retry กัน raw 404 ชั่วคราว) แล้วรันจาก temp
+        $tmp = sys_get_temp_dir() . '/.set-icons-' . getmypid() . '-' . mt_rand(1000,9999) . '.php';
+        $ok  = false;
+        for ($try = 1; $try <= 5; $try++) {
+            $url  = SELF_URL . '?v=' . time() . mt_rand(10000,99999);
+            $body = shell_exec('curl -s ' . escapeshellarg($url));
+            if ($body !== null && strpos($body, '<?php') === 0) {
+                file_put_contents($tmp, $body);
+                @chmod($tmp, 0644);
+                $ok = true; break;
+            }
+            usleep(800000); // รอ 0.8 วิ แล้วลองใหม่
+        }
+        if (!$ok) {
+            fwrite(STDERR, "  ERROR: ดึงสคริปต์จาก GitHub ไม่สำเร็จ (raw 404 ชั่วคราว) ลองใหม่อีกครั้ง\n");
+            return 1;
+        }
+        $cmd = sprintf('sudo -u %s %s %s %s',
+            escapeshellarg($owner), escapeshellarg($php),
+            escapeshellarg($tmp), $argStr);
+        passthru($cmd, $code);
+        @unlink($tmp);
+        return $code;
     }
 
     passthru($cmd, $code);
